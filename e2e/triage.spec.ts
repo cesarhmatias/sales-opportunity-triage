@@ -142,7 +142,7 @@ test("Cedar: vague action and empty date fail inline, then a qualified save move
 
 /* ---------- 4. LangGraph copilot UI flow (mocked API, no tokens) ---------- */
 
-test("copilot: sample note → extract (mocked) → inspect trace and unknowns → apply → save", async ({ page }) => {
+test("copilot: sample note → extract (recorded live response) → inspect trace and unknowns → apply → save", async ({ page }) => {
   let requestBody: Record<string, unknown> | null = null;
   await page.route("**/api/extract-note", async (route) => {
     requestBody = route.request().postDataJSON();
@@ -162,13 +162,11 @@ test("copilot: sample note → extract (mocked) → inspect trace and unknowns �
   await expect(preview.getByTestId("copilot-movement")).toHaveText("Cedar: #4, 37 pts → #3, 62 pts");
   await expect(preview.getByRole("list", { name: "Executed graph nodes" }).getByRole("listitem")).toHaveText([
     "extract_facts",
-    "verify_entailment (rejected)",
-    "extract_facts",
     "verify_entailment",
     "simulate_impact",
     "draft_action",
   ]);
-  await expect(preview).toContainText("Retry: verify_entailment rejected 1 field (budgetStatus)");
+  await expect(preview).not.toContainText("Retry:"); // the live run needed no retry
   await expect(preview).toContainText("“They want to make a buying decision within 21 days.”");
   await expect(preview.getByText("Budget status kept as unknown")).toBeVisible();
   await expect(preview.getByText("Workflow fit kept as apparent")).toBeVisible();
@@ -179,8 +177,8 @@ test("copilot: sample note → extract (mocked) → inspect trace and unknowns �
   await expect(page.getByLabel("Buyer name")).toHaveValue("Maya Lin");
   await expect(page.locator("#qual-cedar-targetDecisionDate")).toHaveValue("2026-03-31");
   await expect(page.getByLabel("Budget")).toHaveValue("unknown");
-  await expect(page.getByLabel("Next action summary")).toHaveValue("Call Maya Lin Thursday about procurement timeline");
-  await expect(page.getByLabel("Follow-up date")).toHaveValue("2026-03-12");
+  await expect(page.getByLabel("Next action summary")).toHaveValue(cedarExtraction.nextAction.action.summary);
+  await expect(page.getByLabel("Follow-up date")).toHaveValue(cedarExtraction.nextAction.action.followUpDate);
 
   // Applying did not save anything: Cedar is still #4 until the rep saves.
   await expect(outsideSection(page).getByRole("button", { name: /^#4\s*Cedar/ })).toBeVisible();
