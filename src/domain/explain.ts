@@ -87,7 +87,7 @@ export function explainStance(evaluation: PriorityEvaluation, focusSlots: number
       ? "Holds a focus slot because the manager pinned it."
       : `Holds one of today's ${focusSlots} focus slots by the prioritization rule.`;
   }
-  if (override?.decision === "hold_out") return "Eligible, but the manager held it out of today's focus slots.";
+  if (override?.decision === "hold_out") return "Eligible, but the manager deferred it from today's focus slots.";
   if (override?.decision === "pin_focus") return "Pinned, but every focus slot is already pinned.";
   return `Eligible, but ranked outside today's ${focusSlots} focus slots. Queue for the next opening.`;
 }

@@ -82,6 +82,17 @@ export function triageWorkspace(state: WorkspaceState, asOf = REFERENCE_DATE): T
   return triage(state.prospects, { asOf, focusSlots: FOCUS_SLOTS, overrides: state.overrides });
 }
 
+/**
+ * Companies that held a focus slot in `before` but not in `after`, excluding the
+ * prospect that was just changed (its own move is reported separately).
+ */
+export function displacedFromFocus(before: TriageResult, after: TriageResult, changedId: string): string[] {
+  const inFocusAfter = new Set(after.entries.filter((e) => e.evaluation.inFocusSlot).map((e) => e.facts.id));
+  return before.entries
+    .filter((e) => e.evaluation.inFocusSlot && e.facts.id !== changedId && !inFocusAfter.has(e.facts.id))
+    .map((e) => e.facts.company);
+}
+
 export function revisionsFor(state: WorkspaceState, prospectId: string): Revision[] {
   return state.revisions.filter((r) => r.prospectId === prospectId);
 }
@@ -254,7 +265,7 @@ export function isManager(actorId: string): boolean {
 
 const OVERRIDE_LABEL: Record<OverrideDecision | "none", string> = {
   pin_focus: "Pinned to today's focus",
-  hold_out: "Held out of today's focus",
+  hold_out: "Deferred from today's focus",
   none: "No override",
 };
 

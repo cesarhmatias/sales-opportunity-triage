@@ -5,6 +5,7 @@ import {
   applyManagerOverride,
   applyQualificationUpdate,
   createSeedWorkspace,
+  displacedFromFocus,
   draftFromFacts,
   revisionsFor,
   triageWorkspace,
@@ -220,7 +221,14 @@ describe("applyQualificationUpdate", () => {
       nextAction: action,
     });
     expect(result.state.nextActions.cedar).toEqual(action);
+    expect(displacedFromFocus(triageWorkspace(seed), triageWorkspace(result.state), "cedar")).toEqual(["Fern"]);
     expect(evaluation(result.state, "fern").stance).toBe("queue_next");
+  });
+
+  it("reports no displacement when the focus slots don't change", () => {
+    const seed = createSeedWorkspace();
+    const result = update(seed, "birch");
+    expect(result.ok && displacedFromFocus(triageWorkspace(seed), triageWorkspace(result.state), "birch")).toEqual([]);
   });
 
   it("does not invent a buyer name: blank inputs stay null", () => {
