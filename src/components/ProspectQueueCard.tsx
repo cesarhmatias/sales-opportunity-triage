@@ -26,7 +26,7 @@ export function ProspectQueueCard({
 
   return (
     <li
-      className={`flex overflow-hidden rounded-lg border bg-white shadow-sm transition-colors ${
+      className={`flex rounded-lg border bg-white shadow-sm transition-colors ${
         selected ? "border-blue-600 ring-1 ring-blue-600" : "border-slate-200 hover:border-slate-300"
       }`}
     >
@@ -76,7 +76,7 @@ export function ProspectQueueCard({
         </span>
       </button>
 
-      <div className="flex shrink-0 items-center gap-1.5 border-l border-slate-200 bg-slate-50 px-3">
+      <div className="flex shrink-0 items-center gap-1.5 rounded-r-lg border-l border-slate-200 bg-slate-50 px-3">
         <input
           id={compareId}
           type="checkbox"
