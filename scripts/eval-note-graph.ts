@@ -91,13 +91,14 @@ async function runAll(cases: readonly EvalCase[]): Promise<Row[]> {
 
 function report(rows: Row[], model: string): string {
   const passed = rows.filter((r) => r.passed).length;
+  const retried = rows.filter((r) => (r.attempts ?? 0) > 1).length;
   const lines = [
     `## Call-note copilot eval: ${passed}/${rows.length} passed`,
     "",
-    `Model: \`${model}\` · Reference date: 2026-03-10 · Prospect: seeded Cedar`,
+    `Model: \`${model}\` · Reference date: 2026-03-10 · Prospect: seeded Cedar · Cases that needed the retry loop: ${retried}`,
     "",
-    "| # | Case | Expected | Verified fields | Attempts | Result |",
-    "|---|------|----------|-----------------|----------|--------|",
+    "| # | Case | Expected | Verified fields | Attempts | Result | Drafted next action |",
+    "|---|------|----------|-----------------|----------|--------|---------------------|",
     ...rows.map((r) =>
       [
         "",
@@ -107,6 +108,9 @@ function report(rows: Row[], model: string): string {
         cell(r.verified),
         r.attempts ?? "-",
         r.passed ? "✅ pass" : `❌ fail${r.error ? ` (error: ${cell(r.error)})` : `: ${cell(r.failedChecks.join(", "))}`}`,
+        r.response
+          ? cell(`${r.response.nextAction.action.summary} (${r.response.nextAction.source === "model" ? "model" : "template fallback"})`)
+          : "-",
         "",
       ].join(" | ").trim(),
     ),
