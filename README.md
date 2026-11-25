@@ -176,7 +176,7 @@ npm run test:e2e    # browser tests against a production build (Playwright)
 npm run eval:notes  # live copilot eval, needs a valid API key and costs API usage
 ```
 
-The end-to-end tests start their own production server on port 3100 with the API key blanked, so they never call a model. The first run may need the browser downloaded with npx playwright install chromium.
+The end-to-end tests start their own production server on port 3100 with the API key blanked, so they never call a model. One of them checks the real 503 message; another replaces /api/extract-note with a recorded response so the full copilot flow (sample note, preview, apply, save) runs deterministically and without token cost. The first run may need the browser downloaded with npx playwright install chromium.
 
 ### Manual checklist
 
