@@ -115,6 +115,8 @@ export interface QualificationDraft {
   budget: BudgetStatus;
   /** "" when the prospect has not stated a date. */
   targetDecisionDate: string;
+  /** A newly stated workflow we can't support ("" for none). Adding one trips the eligibility gate. */
+  newBlocker: string;
 }
 
 export function draftFromFacts(facts: ProspectFacts): QualificationDraft {
@@ -125,12 +127,19 @@ export function draftFromFacts(facts: ProspectFacts): QualificationDraft {
     buyerTitle: facts.economicBuyer.title ?? "",
     budget: facts.budget,
     targetDecisionDate: facts.targetDecisionDate ?? "",
+    newBlocker: "",
   };
 }
 
 const blankToNull = (value: string) => (value.trim() === "" ? null : value.trim());
 
 export function applyDraft(facts: ProspectFacts, draft: QualificationDraft): ProspectFacts {
+  const blocker = draft.newBlocker.trim();
+  const alreadyStated = facts.requirements.some((r) => r.description.toLowerCase() === blocker.toLowerCase());
+  const requirements =
+    blocker === "" || alreadyStated
+      ? facts.requirements
+      : [...facts.requirements, { description: blocker, support: "unsupported" as const }];
   return {
     ...facts,
     workflowFit: draft.workflowFit,
@@ -141,10 +150,16 @@ export function applyDraft(facts: ProspectFacts, draft: QualificationDraft): Pro
     },
     budget: draft.budget,
     targetDecisionDate: blankToNull(draft.targetDecisionDate),
+    requirements,
   };
 }
 
 const show = (value: string | null) => (value === null ? "not recorded" : value);
+
+function listRequirements(facts: ProspectFacts): string | null {
+  if (facts.requirements.length === 0) return null;
+  return facts.requirements.map((r) => `${r.description} (${r.support.replace("_", " ")})`).join("; ");
+}
 
 export function diffFacts(before: ProspectFacts, after: ProspectFacts): FieldDiff[] {
   const pairs: [string, string, string | null, string | null][] = [
@@ -154,6 +169,7 @@ export function diffFacts(before: ProspectFacts, after: ProspectFacts): FieldDif
     ["economicBuyer.title", "Buyer title", before.economicBuyer.title, after.economicBuyer.title],
     ["budget", "Budget", before.budget, after.budget],
     ["targetDecisionDate", "Decision date", before.targetDecisionDate, after.targetDecisionDate],
+    ["requirements", "Stated requirements", listRequirements(before), listRequirements(after)],
   ];
   return pairs
     .filter(([, , from, to]) => from !== to)

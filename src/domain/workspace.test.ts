@@ -231,6 +231,23 @@ describe("applyQualificationUpdate", () => {
     expect(result.ok && displacedFromFocus(triageWorkspace(seed), triageWorkspace(result.state), "birch")).toEqual([]);
   });
 
+  it("records a newly stated unsupported blocker, which gates the prospect", () => {
+    const seed = createSeedWorkspace();
+    const draft = { ...draftFromFacts(facts(seed, "delta")), newBlocker: "  On-prem air-gapped deployment " };
+    const result = update(seed, "delta", { draft });
+    if (!result.ok) throw new Error("update failed");
+    expect(facts(result.state, "delta").requirements).toEqual([
+      { description: "On-prem air-gapped deployment", support: "unsupported" },
+    ]);
+    expect(result.revision.after).toMatchObject({ score: null, stance: "excluded" });
+    expect(result.revision.fieldDiffs).toContainEqual({
+      field: "requirements",
+      label: "Stated requirements",
+      from: "not recorded",
+      to: "On-prem air-gapped deployment (unsupported)",
+    });
+  });
+
   it("does not invent a buyer name: blank inputs stay null", () => {
     const seed = createSeedWorkspace();
     const draft = { ...draftFromFacts(facts(seed, "cedar")), buyerStatus: "confirmed" as const, buyerName: "  " };
