@@ -40,7 +40,11 @@ export interface StructuredLLM {
   }): Promise<z.output<S>>;
 }
 
-export const DEFAULT_MODEL = "claude-haiku-4-5";
+/**
+ * The model the 12-case eval (npm run eval:notes) was run against. Keep the default on an
+ * evaluated model so a deployment without ANTHROPIC_MODEL never runs an untested one.
+ */
+export const DEFAULT_MODEL = "claude-sonnet-5-5";
 
 /**
  * Structured output via Anthropic's native JSON-schema mode (`output_config.format`) rather

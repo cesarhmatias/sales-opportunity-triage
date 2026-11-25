@@ -141,7 +141,7 @@ Overrides change **slot allocation only**; the priority score never changes.
 Turns messy call notes into a **draft** for the manual form. It never scores or ranks:
 the impact preview comes from the same pure `triage()` engine as the queue.
 
-LangGraph `StateGraph` (`noteIntakeGraph.ts`), model from `ANTHROPIC_MODEL` or `claude-haiku-4-5`:
+LangGraph `StateGraph` (`noteIntakeGraph.ts`), model from `ANTHROPIC_MODEL` or `claude-sonnet-5-5` (the model the eval ran on):
 
 1. `extract_facts` proposes only fields stated as current facts (fit, buyer status/name, budget,
    timeline days, unsupported blocker), each with a verbatim `quote`. Unmentioned, negated,
