@@ -136,6 +136,35 @@ Overrides change **slot allocation only**; the priority score never changes.
 - "Reset seeded cases" restores the six prospects and clears next actions, overrides and history,
   keeping the simulated role.
 
+## 9. Call-note copilot (optional, `src/ai/`)
+
+Turns messy call notes into a **draft** for the manual form. It never scores or ranks:
+the impact preview comes from the same pure `triage()` engine as the queue.
+
+LangGraph `StateGraph` (`noteIntakeGraph.ts`), model from `ANTHROPIC_MODEL` or `claude-haiku-4-5`:
+
+1. `extract_facts` proposes only fields stated as current facts (fit, buyer status/name, budget,
+   timeline days, unsupported blocker), each with a verbatim `quote`. Unmentioned, negated,
+   hypothetical, hoped-for, questioned, third-party, or rep-task timings stay unknown.
+2. `verify_entailment` first strips proposals whose quote is not a literal substring of the note
+   (whitespace/apostrophes normalized, case-sensitive; buyer names must appear in their quote),
+   then asks the model whether each remaining quote entails its value in full context.
+   Any rejection on attempt 1 routes back to `extract_facts` once with the critique.
+3. `simulate_impact` applies the verified patch and runs `triage()` before/after.
+4. `draft_action` drafts a next action for the remaining gaps; if it fails `validateNextAction`,
+   a deterministic gap template replaces it.
+
+Every node appends to `nodeTrace` (node, status, summary, durationMs).
+
+`POST /api/extract-note`: strict zod payload (`prospectRecordSchema`, note ≤ 2000 chars, ≤ 64 KB body),
+400 on malformed JSON/payload or unknown prospect, 429 after 15 requests per IP per 5 minutes
+(in-memory, per server instance), **503 `LLM_UNAVAILABLE` when `ANTHROPIC_API_KEY` is unset (no
+regex fallback)**, 502 `LLM_ERROR` on model failure. Structured output uses Anthropic's JSON-schema
+mode; no `temperature` is sent because the installed SDK's API version (2026-10-21) rejects
+sampling parameters.
+
+The browser applies only verified values to the form; the rep reviews and saves as usual.
+
 ## Open questions (not built yet)
 
 - Real authentication instead of the simulated role switcher.
