@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createRateLimiter } from "../../lib/rateLimit";
-import { handleExtractNote, type ExtractNoteDeps } from "../extractNoteHandler";
+import { handleExtractNote, isConfigurationError, type ExtractNoteDeps } from "../extractNoteHandler";
 import { MAX_NOTE_CHARS } from "../noteIntakeContract";
 import type { StructuredLLM } from "../noteIntakeGraph";
 import { ScriptedLLM, extraction, requestFor } from "./scriptedLLM";
@@ -89,6 +89,36 @@ describe("POST /api/extract-note handler", () => {
     expect(status).toBe(502);
     expect(body.code).toBe("LLM_ERROR");
     expect(JSON.stringify(body)).not.toContain("secret");
+  });
+
+  it("returns 503 LLM_MISCONFIGURED (not a try-again 502) when the API key is rejected", async () => {
+    // Same fields the real AuthenticationError carries through ChatAnthropic.
+    const authError = Object.assign(new Error('401 {"type":"error","error":{"type":"authentication_error"}}'), {
+      status: 401,
+      lc_error_code: "MODEL_AUTHENTICATION",
+    });
+    const rejectedKey: StructuredLLM = {
+      invoke: async () => {
+        throw authError;
+      },
+    };
+    const { status, body } = await json(await handleExtractNote(post(requestFor("cedar", NOTE)), deps(() => rejectedKey)));
+    expect(status).toBe(503);
+    expect(body.code).toBe("LLM_MISCONFIGURED");
+    expect(body.message).not.toMatch(/try again/i);
+  });
+
+  it.each([
+    [{ status: 401 }, true],
+    [{ status: 403 }, true],
+    [{ status: 404 }, true],
+    [{ lc_error_code: "MODEL_AUTHENTICATION" }, true],
+    [{ status: 429 }, false],
+    [{ status: 529 }, false],
+    [new Error("socket hang up"), false],
+    [null, false],
+  ])("classifies %o as configuration error: %s", (error, expected) => {
+    expect(isConfigurationError(error)).toBe(expected);
   });
 
   it("returns 413 for an oversized body", async () => {

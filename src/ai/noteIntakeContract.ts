@@ -122,7 +122,16 @@ export const extractNoteResponseSchema = z.strictObject({
 export type ExtractNoteResponse = z.infer<typeof extractNoteResponseSchema>;
 
 export const apiErrorSchema = z.object({
-  code: z.enum(["INVALID_JSON", "INVALID_REQUEST", "UNKNOWN_PROSPECT", "PAYLOAD_TOO_LARGE", "RATE_LIMITED", "LLM_UNAVAILABLE", "LLM_ERROR"]),
+  code: z.enum([
+    "INVALID_JSON",
+    "INVALID_REQUEST",
+    "UNKNOWN_PROSPECT",
+    "PAYLOAD_TOO_LARGE",
+    "RATE_LIMITED",
+    "LLM_UNAVAILABLE",
+    "LLM_MISCONFIGURED",
+    "LLM_ERROR",
+  ]),
   message: z.string(),
   issues: z.array(z.object({ path: z.string(), message: z.string() })).optional(),
 });

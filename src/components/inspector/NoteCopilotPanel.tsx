@@ -31,6 +31,9 @@ type Status =
 const UNAVAILABLE_MESSAGE =
   "Live note extraction isn't configured on this deployment (no ANTHROPIC_API_KEY), so nothing was sent to Claude. Use the manual form right below.";
 
+const MISCONFIGURED_MESSAGE =
+  "Live note extraction is misconfigured on this deployment: the server's Anthropic API key or model was rejected, so nothing was extracted. Use the manual form right below.";
+
 const rateLimitedMessage = (retryAfter: string | null) =>
   `Rate limit reached (15 extractions per 5 minutes per network).${
     retryAfter ? ` Try again in ${retryAfter}s,` : " Try again shortly,"
@@ -73,7 +76,9 @@ export function NoteCopilotPanel({ entry, state, onApply }: NoteCopilotPanelProp
       const message =
         code === "LLM_UNAVAILABLE"
           ? UNAVAILABLE_MESSAGE
-          : code === "RATE_LIMITED"
+          : code === "LLM_MISCONFIGURED"
+            ? MISCONFIGURED_MESSAGE
+            : code === "RATE_LIMITED"
             ? rateLimitedMessage(response.headers.get("retry-after"))
             : error.success
               ? error.data.message

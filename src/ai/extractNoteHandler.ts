@@ -17,6 +17,17 @@ export const defaultDeps: ExtractNoteDeps = {
   createLLM: () => (process.env.ANTHROPIC_API_KEY ? createAnthropicLLM() : null),
 };
 
+/**
+ * A rejected API key (401/403) or an unknown model (404) is a deployment problem that
+ * retrying can't fix, unlike a timeout or overload. Detected from the error's fields
+ * (Anthropic SDK status, LangChain error code), not by matching message text.
+ */
+export function isConfigurationError(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const { status, lc_error_code: code } = error as { status?: unknown; lc_error_code?: unknown };
+  return status === 401 || status === 403 || status === 404 || code === "MODEL_AUTHENTICATION" || code === "MODEL_NOT_FOUND";
+}
+
 function errorResponse(status: number, body: ApiError, headers?: HeadersInit): Response {
   return Response.json(body, { status, headers });
 }
@@ -76,6 +87,13 @@ export async function handleExtractNote(request: Request, deps: ExtractNoteDeps 
     return Response.json(await runNoteIntake(input, { llm }));
   } catch (error) {
     console.error("[extract-note] graph run failed", error instanceof Error ? error.message : error);
+    if (isConfigurationError(error)) {
+      return errorResponse(503, {
+        code: "LLM_MISCONFIGURED",
+        message:
+          "Live note extraction is misconfigured on this deployment (the API key or model was rejected). Use the manual form instead.",
+      });
+    }
     return errorResponse(502, {
       code: "LLM_ERROR",
       message: "The note copilot couldn't finish. Nothing was changed; try again or use the manual form.",

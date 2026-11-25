@@ -110,6 +110,16 @@ describe("call-note copilot panel", () => {
     expect(JSON.parse(String(init.body))).toMatchObject({ prospectId: "cedar", actorId: "jordan-lee" });
   });
 
+  it("explains a rejected server key (503 LLM_MISCONFIGURED) without suggesting a retry", async () => {
+    stubFetch(503, { code: "LLM_MISCONFIGURED", message: "misconfigured" });
+    renderOnCedar();
+    extract("Any note");
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveAttribute("data-code", "LLM_MISCONFIGURED");
+    expect(alert).toHaveTextContent(/API key or model was rejected/);
+    expect(alert).not.toHaveTextContent(/try again/i);
+  });
+
   it("explains a 429 with the Retry-After wait", async () => {
     stubFetch(429, { code: "RATE_LIMITED", message: "Too many" }, { "retry-after": "42" });
     renderOnCedar();
