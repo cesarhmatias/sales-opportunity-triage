@@ -41,6 +41,8 @@ describe("next action summary", () => {
     "Follow-up with them, soon.",
     "call them",
     "Call them tomorrow",
+    "Call them Saturday",
+    "Ping them over the weekend",
     "send email",
     "Send an email to them",
     "check in",

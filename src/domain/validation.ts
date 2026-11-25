@@ -51,11 +51,12 @@ const GENERIC_WORDS = new Set([
   "speak", "circle", "back", "again", "meet", "meeting", "schedule", "set", "book",
   // pronouns / determiners / prepositions
   "them", "they", "him", "her", "it", "us", "client", "prospect", "customer", "lead", "deal",
-  "the", "a", "an", "to", "with", "in", "on", "and", "or", "about", "re", "for", "some", "any",
+  "the", "a", "an", "to", "with", "in", "on", "and", "or", "about", "re", "for", "at", "by", "over", "some", "any",
   "thing", "things", "stuff", "something", "more", "info",
   // vague timing (concrete dates belong in followUpDate)
   "soon", "later", "asap", "today", "tomorrow", "tonight", "next", "this", "week", "month",
-  "monday", "tuesday", "wednesday", "thursday", "friday", "morning", "afternoon", "eod",
+  "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday", "weekend",
+  "morning", "afternoon", "eod",
 ]);
 
 export interface NextActionInput {
