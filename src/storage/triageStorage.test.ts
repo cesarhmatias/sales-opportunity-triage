@@ -1,48 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { createSeedWorkspace, type WorkspaceState } from "../domain/workspace";
+import { BlockedStorage, FullStorage, MemoryStorage } from "../test/fakeStorage";
 import {
   STORAGE_KEY,
   createWorkspaceStore,
   loadWorkspaceState,
   saveWorkspaceState,
 } from "./triageStorage";
-
-class MemoryStorage implements Storage {
-  private data = new Map<string, string>();
-  get length() {
-    return this.data.size;
-  }
-  clear() {
-    this.data.clear();
-  }
-  getItem(key: string) {
-    return this.data.get(key) ?? null;
-  }
-  key(index: number) {
-    return [...this.data.keys()][index] ?? null;
-  }
-  removeItem(key: string) {
-    this.data.delete(key);
-  }
-  setItem(key: string, value: string) {
-    this.data.set(key, value);
-  }
-}
-
-class BlockedStorage extends MemoryStorage {
-  getItem(): string | null {
-    throw new DOMException("blocked", "SecurityError");
-  }
-  setItem(): void {
-    throw new DOMException("blocked", "SecurityError");
-  }
-}
-
-class FullStorage extends MemoryStorage {
-  setItem(): void {
-    throw new DOMException("full", "QuotaExceededError");
-  }
-}
 
 const withRole = (actorId: string): WorkspaceState => ({ ...createSeedWorkspace(), actorId });
 
