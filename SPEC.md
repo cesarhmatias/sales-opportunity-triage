@@ -165,6 +165,11 @@ sampling parameters.
 
 The browser applies only verified values to the form; the rep reviews and saves as usual.
 
+**Live eval:** `npm run eval:notes` (or `-- --only=2,5`) runs 12 hard call notes (negations, curly
+apostrophes, modals, conditionals, third-party claims, rep task timings, role attribution) through
+the real graph and prints a markdown pass/fail table. Cases and grading live in
+`src/ai/eval/noteEvalCases.ts`; it needs a valid `ANTHROPIC_API_KEY` (no mocks).
+
 ## Open questions (not built yet)
 
 - Real authentication instead of the simulated role switcher.
