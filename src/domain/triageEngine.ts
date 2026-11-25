@@ -1,6 +1,7 @@
 import { daysBetween } from "./dates";
 import type {
   GateReason,
+  ManagerOverride,
   PriorityBreakdown,
   PriorityEvaluation,
   ProspectFacts,
@@ -153,10 +154,22 @@ export interface TriageOptions {
   /** Reference date (YYYY-MM-DD). Injected; the engine never reads the clock. */
   asOf: string;
   focusSlots?: number;
+  /** Manager allocation decisions. They change slots, never scores. */
+  overrides?: readonly ManagerOverride[];
 }
 
+/**
+ * Ranks prospects and allocates today's focus slots.
+ *
+ * Allocation: gated prospects never get a slot (overrides on them are ignored).
+ * Eligible prospects pinned by the manager take slots first, in rule order, up to
+ * the slot count; remaining slots go to the best-ranked eligible prospects that
+ * are not held out. Displayed rank follows allocation, so a prospect outside the
+ * slots never ranks above one inside them. `ruleRank` keeps the pure rule order.
+ */
 export function triage(prospects: readonly ProspectFacts[], options: TriageOptions): TriageResult {
   const focusSlots = options.focusSlots ?? DEFAULT_FOCUS_SLOTS;
+  const overrides = new Map((options.overrides ?? []).map((o) => [o.prospectId, o]));
 
   const scored: Scored[] = prospects.map((facts) => {
     const rawDays = facts.targetDecisionDate === null ? null : daysBetween(options.asOf, facts.targetDecisionDate);
@@ -167,14 +180,31 @@ export function triage(prospects: readonly ProspectFacts[], options: TriageOptio
 
   const eligible = scored.filter((s) => s.gate.length === 0).sort(compareEligible);
   const gated = scored.filter((s) => s.gate.length > 0).sort(compareGated);
+  const ruleOrder = [...eligible, ...gated];
 
-  const entries: TriageEntry[] = [...eligible, ...gated].map((s, index) => {
+  const decisionOf = (s: Scored) => overrides.get(s.facts.id)?.decision;
+  const pinned = eligible.filter((s) => decisionOf(s) === "pin_focus");
+  const pinnedInSlots = pinned.slice(0, focusSlots);
+  const filled = eligible
+    .filter((s) => decisionOf(s) === undefined)
+    .slice(0, Math.max(0, focusSlots - pinnedInSlots.length));
+  const inSlots = new Set([...pinnedInSlots, ...filled]);
+
+  const allocationOrder = [
+    ...eligible.filter((s) => inSlots.has(s)),
+    ...eligible.filter((s) => !inSlots.has(s)),
+    ...gated,
+  ];
+
+  const entries: TriageEntry[] = allocationOrder.map((s, index) => {
     const isEligible = s.gate.length === 0;
-    const inFocusSlot = isEligible && index < focusSlots;
+    const inFocusSlot = inSlots.has(s);
     const stance: Stance = !isEligible ? "excluded" : inFocusSlot ? "work_today" : "queue_next";
+    const override = overrides.get(s.facts.id) ?? null;
     const evaluation: PriorityEvaluation = {
       prospectId: s.facts.id,
       rank: index + 1,
+      ruleRank: ruleOrder.indexOf(s) + 1,
       eligible: isEligible,
       gateReasons: s.gate,
       priorityScore: s.score,
@@ -183,9 +213,20 @@ export function triage(prospects: readonly ProspectFacts[], options: TriageOptio
       daysToDecision: s.rawDays,
       missingInfo: missingInfo(s.facts, s.rawDays),
       scopeRisks: scopeRisks(s.facts),
+      override,
+      overrideNote: overrideNote(override, isEligible, inFocusSlot),
     };
     return { facts: s.facts, evaluation };
   });
 
   return { asOf: options.asOf, focusSlots, entries };
+}
+
+function overrideNote(override: ManagerOverride | null, eligible: boolean, inFocusSlot: boolean): string | null {
+  if (!override) return null;
+  if (!eligible) return "Override ignored: the eligibility gate still excludes this prospect.";
+  if (override.decision === "pin_focus" && !inFocusSlot) {
+    return "Pinned, but every focus slot is already pinned by the manager.";
+  }
+  return null;
 }

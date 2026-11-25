@@ -38,6 +38,30 @@ export interface ProspectFacts {
   requirements: StatedRequirement[];
 }
 
+/* ---------- Team decisions (recorded, not observed) ---------- */
+
+export interface NextAction {
+  summary: string;
+  ownerId: string;
+  /** ISO date (YYYY-MM-DD). */
+  followUpDate: string;
+}
+
+/**
+ * A manager's allocation decision. It never changes the priority score;
+ * it only changes who gets one of today's focus slots.
+ */
+export type OverrideDecision = "pin_focus" | "hold_out";
+
+export interface ManagerOverride {
+  prospectId: string;
+  decision: OverrideDecision;
+  reason: string;
+  setBy: string;
+  /** ISO timestamp. */
+  setAt: string;
+}
+
 /* ---------- Derived evaluation (never stored back into facts) ---------- */
 
 export type GateReasonCode = "poor_fit" | "unsupported_requirement" | "no_buyer_access";
@@ -62,8 +86,10 @@ export type Stance = "work_today" | "queue_next" | "excluded";
 
 export interface PriorityEvaluation {
   prospectId: string;
-  /** 1-based position in today's ranking. */
+  /** 1-based position in today's allocation: focus-slot holders first, then the rest. */
   rank: number;
+  /** 1-based position by the prioritization rule alone (ignores manager overrides). */
+  ruleRank: number;
   eligible: boolean;
   gateReasons: GateReason[];
   /** null when the prospect is gated out; gated deals are not scored. */
@@ -74,6 +100,10 @@ export interface PriorityEvaluation {
   daysToDecision: number | null;
   missingInfo: string[];
   scopeRisks: string[];
+  /** The manager override that applies to this prospect, if any. */
+  override: ManagerOverride | null;
+  /** Explains an override that could not take full effect (e.g. gated prospect, slots already pinned). */
+  overrideNote: string | null;
 }
 
 export interface TriageEntry {
