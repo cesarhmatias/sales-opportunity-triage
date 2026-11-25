@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { isIsoDate } from "../../domain/dates";
 import { STANCE_LABEL } from "../../domain/explain";
 import type { BudgetStatus, BuyerStatus, NextAction, TriageEntry, WorkflowFit } from "../../domain/types";
@@ -31,17 +31,25 @@ interface QualificationFormProps {
   entry: TriageEntry;
   state: WorkspaceState;
   savedNextAction: NextAction | null;
+  /** Values applied from the call-note copilot; the rep still reviews and saves them. */
+  prefill?: { draft: QualificationDraft; action: NextAction } | null;
   onSave: (draft: QualificationDraft, reason: string, nextAction: NextAction) => FieldError[];
 }
 
 const EMPTY_ACTION: NextAction = { summary: "", ownerId: "", followUpDate: "" };
 
-export function QualificationForm({ entry, state, savedNextAction, onSave }: QualificationFormProps) {
+export function QualificationForm({ entry, state, savedNextAction, prefill, onSave }: QualificationFormProps) {
   const { facts, evaluation } = entry;
-  const [draft, setDraft] = useState<QualificationDraft>(() => draftFromFacts(facts));
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const [draft, setDraft] = useState<QualificationDraft>(() => prefill?.draft ?? draftFromFacts(facts));
   const [reason, setReason] = useState("");
   // Untouched prospects start with a blank follow-up date so missing-date validation is visible.
-  const [action, setAction] = useState<NextAction>(() => savedNextAction ?? EMPTY_ACTION);
+  const [action, setAction] = useState<NextAction>(() => prefill?.action ?? savedNextAction ?? EMPTY_ACTION);
+
+  // A copilot draft remounts this form; bring the rep to it so they review before saving.
+  useEffect(() => {
+    if (prefill) headingRef.current?.focus();
+  }, [prefill]);
   const [errors, setErrors] = useState<FieldError[]>([]);
 
   const id = (name: string) => `qual-${facts.id}-${name}`;
@@ -88,12 +96,17 @@ export function QualificationForm({ entry, state, savedNextAction, onSave }: Qua
 
   return (
     <section aria-labelledby={id("heading")} className={cardClass}>
-      <h3 id={id("heading")} className={cardTitleClass}>
+      <h3 id={id("heading")} ref={headingRef} tabIndex={-1} className={cardTitleClass}>
         3. Record qualification change &amp; next action
       </h3>
       <p className="mt-1 text-sm text-slate-600">
         Update only what the prospect actually told you. Leave a field unknown or blank rather than guessing.
       </p>
+      {prefill && (
+        <p className="mt-2 rounded-md bg-violet-50 p-2 text-sm text-violet-900">
+          Prefilled from call notes with verified facts only. Review every field, then save.
+        </p>
+      )}
 
       <form onSubmit={handleSubmit} noValidate className="mt-4 space-y-5">
         {errors.length > 0 && (
@@ -207,6 +220,23 @@ export function QualificationForm({ entry, state, savedNextAction, onSave }: Qua
           <p id={id("buyer-hint")} className={`${hintClass} sm:col-span-2`}>
             Record a buyer name or title only if the prospect gave it. Blank stays &ldquo;not recorded&rdquo;.
           </p>
+          <div className="sm:col-span-2">
+            <label htmlFor={id("newBlocker")} className={labelClass}>
+              New unsupported-workflow blocker (optional)
+            </label>
+            <input
+              id={id("newBlocker")}
+              type="text"
+              className={inputClass}
+              value={draft.newBlocker}
+              onChange={(e) => setDraftField("newBlocker", e.target.value)}
+              aria-describedby={id("blocker-hint")}
+            />
+            <p id={id("blocker-hint")} className={hintClass}>
+              Only if the prospect stated it. A recorded blocker excludes the prospect from today&rsquo;s slots via the
+              eligibility gate.
+            </p>
+          </div>
           <div className="sm:col-span-2">
             <label htmlFor={id("reason")} className={labelClass}>
               Reason for change {reasonRequired ? "(required)" : "(optional)"}

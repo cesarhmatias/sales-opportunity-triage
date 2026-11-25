@@ -1,9 +1,12 @@
 "use client";
 
+import { useState } from "react";
+import type { ExtractNoteResponse } from "../ai/noteIntakeContract";
 import { formatUsd, STANCE_LABEL } from "../domain/explain";
 import type { NextAction, OverrideDecision, TriageEntry } from "../domain/types";
 import type { FieldError } from "../domain/validation";
-import { revisionsFor, type QualificationDraft, type WorkspaceState } from "../domain/workspace";
+import { draftFromFacts, revisionsFor, type QualificationDraft, type WorkspaceState } from "../domain/workspace";
+import { NoteCopilotPanel } from "./inspector/NoteCopilotPanel";
 import { ChangeLogCard } from "./inspector/ChangeLogCard";
 import { ObservedFactsCard } from "./inspector/ObservedFactsCard";
 import { PrioritizationRuleCard } from "./inspector/PrioritizationRuleCard";
@@ -38,6 +41,15 @@ export function ProspectInspector({
   // override or a role switch never wipes an unsaved qualification/next-action draft.
   const qualificationSaves = revisions.filter((r) => r.kind === "qualification_update").length;
   const overrideSaves = revisions.length - qualificationSaves;
+  const [prefill, setPrefill] = useState<{ id: number; draft: QualificationDraft; action: NextAction } | null>(null);
+
+  function applyCopilotDraft(result: ExtractNoteResponse) {
+    setPrefill((previous) => ({
+      id: (previous?.id ?? 0) + 1,
+      draft: { ...draftFromFacts(facts), ...result.draftPatch },
+      action: result.nextAction.action,
+    }));
+  }
 
   return (
     <section aria-labelledby="inspector-heading" className="space-y-4">
@@ -61,12 +73,19 @@ export function ProspectInspector({
         onApplyOverride={(decision, reason) => onApplyOverride(facts.id, decision, reason)}
         onSwitchToManager={onSwitchRole}
       />
+      <NoteCopilotPanel entry={entry} state={state} onApply={applyCopilotDraft} />
       <QualificationForm
-        key={`form-${facts.id}:${qualificationSaves}`}
+        key={`form-${facts.id}:${qualificationSaves}:${prefill?.id ?? 0}`}
         entry={entry}
         state={state}
         savedNextAction={nextAction}
-        onSave={(draft, reason, action) => onSaveQualification(facts.id, draft, reason, action)}
+        prefill={prefill}
+        onSave={(draft, reason, action) => {
+          const errors = onSaveQualification(facts.id, draft, reason, action);
+          // Once saved, the form should show saved values, not the copilot draft again.
+          if (errors.length === 0) setPrefill(null);
+          return errors;
+        }}
       />
       <ChangeLogCard nextAction={nextAction} revisions={revisions} />
     </section>
