@@ -151,8 +151,10 @@ LangGraph `StateGraph` (`noteIntakeGraph.ts`), model from `ANTHROPIC_MODEL` or `
    then asks the model whether each remaining quote entails its value in full context.
    Any rejection on attempt 1 routes back to `extract_facts` once with the critique.
 3. `simulate_impact` applies the verified patch and runs `triage()` before/after.
-4. `draft_action` drafts a next action for the remaining gaps; if it fails `validateNextAction`,
-   a deterministic gap template replaces it.
+4. `draft_action` drafts a next action for one primary gap chosen in code (gate → buyer → budget →
+   timeline; bookkeeping gaps like a missing title are skipped). The draft must be a prospect-facing
+   step (no CRM or data-entry chores) and pass `validateNextAction`; otherwise a deterministic gap
+   template replaces it.
 
 Every node appends to `nodeTrace` (node, status, summary, durationMs).
 

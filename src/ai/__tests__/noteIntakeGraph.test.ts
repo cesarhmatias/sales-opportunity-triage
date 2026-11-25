@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { extractNoteResponseSchema } from "../noteIntakeContract";
-import { runNoteIntake } from "../noteIntakeGraph";
+import { internalTaskProblem, primaryGap, runNoteIntake } from "../noteIntakeGraph";
 import { isLiteralQuote, literalCheck } from "../notePatch";
 import { ScriptedLLM, extraction, requestFor, verdicts } from "./scriptedLLM";
 
@@ -204,6 +204,43 @@ describe("note intake graph: next-action drafting", () => {
       followUpDate: "2026-03-12",
     });
     expect(result.nodeTrace.at(-1)).toMatchObject({ node: "draft_action", status: "fallback" });
+  });
+
+  it("aims the drafter at the budget gap, not title bookkeeping, and rejects a CRM chore", async () => {
+    const note =
+      "Maya Lin, VP of Operations, confirmed she is the final decision maker. They want to decide within 21 days. Budget hasn't been discussed with finance yet.";
+    const llm = new ScriptedLLM({
+      extract_facts: [
+        extraction({
+          buyerStatus: { value: "confirmed", quote: "confirmed she is the final decision maker" },
+          buyerName: { value: "Maya Lin", quote: "Maya Lin, VP of Operations, confirmed she is the final decision maker" },
+          timelineDays: { value: 21, quote: "They want to decide within 21 days." },
+        }),
+      ],
+      verify_entailment: [verdicts(["buyerStatus", true], ["buyerName", true], ["timelineDays", true])],
+      // What a live run actually produced once: an internal chore in a system the team doesn't have.
+      draft_action: [{ summary: "Record Maya Lin's VP of Operations title in the CRM", followUpInDays: 1 }],
+    });
+
+    const result = await runNoteIntake(requestFor("cedar", note), { llm });
+
+    const prompt = llm.callsTo("draft_action")[0].user;
+    expect(prompt).toContain("PRIMARY GAP: Budget not yet discussed");
+    expect(prompt).not.toContain("name/title not recorded");
+    expect(result.nextAction.source).toBe("template");
+    expect(result.nextAction.modelDraftErrors).toEqual(["Drafted action refers to an internal system; this team has no CRM."]);
+    expect(result.nextAction.action.summary).toBe("Confirm Cedar's budget owner and approval steps for this purchase");
+  });
+
+  it("orders gaps deterministically and skips bookkeeping gaps", () => {
+    expect(
+      primaryGap(["Economic buyer confirmed, but name/title not recorded", "Decision date unknown", "Budget not yet discussed"]),
+    ).toBe("Budget not yet discussed");
+    expect(primaryGap(["Decision date unknown", "Economic buyer not identified"])).toBe("Economic buyer not identified");
+    expect(primaryGap(["Economic buyer confirmed, but name/title not recorded"])).toBeNull();
+    expect(internalTaskProblem("Update the opportunity in Salesforce")).toMatch(/no CRM/);
+    expect(internalTaskProblem("Log Maya's title")).toMatch(/data entry/);
+    expect(internalTaskProblem("Email Cedar's CFO asking who signs off on the purchase")).toBeNull();
   });
 
   it("records a verified unsupported blocker, which the engine then gates", async () => {
