@@ -271,7 +271,8 @@ export function applyManagerOverride(
   if (!isManager(input.actorId)) {
     errors.push({ field: "actorId", message: "Only the sales manager can set or clear an override." });
   }
-  if (!entry.evaluation.eligible) {
+  // A stale override on a prospect that later became gated can still be cleared.
+  if (!entry.evaluation.eligible && input.decision !== null) {
     errors.push({ field: "decision", message: "Gated prospects cannot be overridden into or out of focus." });
   }
   const current = state.overrides.find((o) => o.prospectId === input.prospectId) ?? null;
@@ -279,7 +280,11 @@ export function applyManagerOverride(
     errors.push({ field: "decision", message: "Choose a different override than the current one." });
   }
   if (input.decision === "pin_focus") {
-    const otherPins = state.overrides.filter((o) => o.decision === "pin_focus" && o.prospectId !== input.prospectId);
+    // Pins on gated prospects are ignored by allocation, so they don't use up the cap.
+    const eligibleIds = new Set(before.entries.filter((e) => e.evaluation.eligible).map((e) => e.facts.id));
+    const otherPins = state.overrides.filter(
+      (o) => o.decision === "pin_focus" && o.prospectId !== input.prospectId && eligibleIds.has(o.prospectId),
+    );
     if (otherPins.length >= before.focusSlots) {
       errors.push({ field: "decision", message: `All ${before.focusSlots} focus slots are already pinned.` });
     }

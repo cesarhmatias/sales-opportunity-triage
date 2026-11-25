@@ -162,6 +162,26 @@ describe("applyManagerOverride", () => {
     ).toEqual(["decision"]);
   });
 
+  it("lets the manager clear a stale pin on a prospect that became gated, and frees the pin cap", () => {
+    const gatedElm = {
+      ...createSeedWorkspace(),
+      prospects: createSeedWorkspace().prospects.map((p) => (p.id === "elm" ? { ...p, workflowFit: "poor" as const } : p)),
+      overrides: ["elm", "birch", "delta"].map((id) => override(id, "pin_focus")),
+    };
+    // Elm's pin is ignored, so a third effective pin is still allowed.
+    expect(
+      applyManagerOverride(gatedElm, { ...base, prospectId: "fern", decision: "pin_focus", actorId: "jordan-lee" }).ok,
+    ).toBe(true);
+    const cleared = applyManagerOverride(gatedElm, {
+      ...base,
+      reason: "",
+      prospectId: "elm",
+      decision: null,
+      actorId: "jordan-lee",
+    });
+    expect(cleared.ok && cleared.state.overrides.map((o) => o.prospectId)).toEqual(["birch", "delta"]);
+  });
+
   it("clears an override without requiring a reason", () => {
     const state = { ...createSeedWorkspace(), overrides: [override("elm", "pin_focus")] };
     const result = applyManagerOverride(state, {

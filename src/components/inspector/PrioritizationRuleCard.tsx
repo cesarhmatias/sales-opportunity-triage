@@ -40,7 +40,8 @@ export function PrioritizationRuleCard({ entry, focusSlots, canOverride, onApply
   const [reason, setReason] = useState("");
   const [errors, setErrors] = useState<FieldError[]>([]);
 
-  const overrideLocked = !canOverride || !evaluation.eligible;
+  // Gated prospects can only have a stale override cleared, never a new one set.
+  const overrideLocked = !canOverride || (!evaluation.eligible && !current);
   const reasonError = errors.find((e) => e.field === "reason");
   const otherErrors = errors.filter((e) => e.field !== "reason");
 
@@ -137,7 +138,10 @@ export function PrioritizationRuleCard({ entry, focusSlots, canOverride, onApply
             </p>
           )}
           {canOverride && !evaluation.eligible && (
-            <p className="text-sm text-slate-600">Gated prospects can&rsquo;t be overridden into or out of focus.</p>
+            <p className="text-sm text-slate-600">
+              Gated prospects can&rsquo;t be overridden into or out of focus
+              {current ? "; you can only clear the existing override." : "."}
+            </p>
           )}
 
           <div className="space-y-2">
@@ -152,6 +156,7 @@ export function PrioritizationRuleCard({ entry, focusSlots, canOverride, onApply
                     value={option.value}
                     checked={choice === option.value}
                     onChange={() => setChoice(option.value)}
+                    disabled={!evaluation.eligible && option.value !== "none"}
                     className="mt-0.5 size-4"
                   />
                   <label htmlFor={id} className="text-sm">
