@@ -105,8 +105,38 @@ takes #3; Fern drops to #4 / `queue_next`.
   unknown for tie-breaks, and is flagged in `missingInfo` for reconfirmation.
 - Fewer eligible prospects than slots leaves slots empty; gated deals never fill them.
 
+## 6. Manager overrides
+
+Overrides change **slot allocation only**; the priority score never changes.
+
+- Only the sales manager (Jordan Lee) can set or clear one; reps see the controls disabled.
+- Decisions: **pin to today's focus** or **hold out of today's focus**. Setting one needs a written
+  reason; clearing one does not.
+- Gated prospects cannot be overridden (the gate stays strict).
+- Allocation: pinned eligible prospects take slots first (in rule order), then the best-ranked
+  eligible prospects that are not held out. At most 3 pins can exist at once.
+- Displayed `rank` follows allocation (slot holders first), so a prospect outside the slots never
+  shows a higher rank than one inside them. `ruleRank` keeps the pure rule order for inspection.
+
+## 7. Workspace state and history (`src/domain/workspace.ts`)
+
+- Every save of a qualification change **requires a next action** (summary, owner, follow-up date).
+- Each save or override appends a `Revision`: who (simulated role), when, reason, rank/score/stance
+  before and after, field diffs, and a snapshot of the next action. Revisions are never edited.
+- Buyer name/title inputs left blank stay `null` ("not recorded").
+
+## 8. Browser persistence (`src/storage/triageStorage.ts`)
+
+- One versioned key, `sales_triage_v1`, validated with zod on every load. Malformed, wrong-version
+  or invalid data falls back to the seeded cases with a visible notice.
+- Read through `useSyncExternalStore`: server render and hydration use a constant seeded snapshot,
+  then the client switches to the stored one (no set-state-in-effect, no hydration mismatch).
+- Changes apply in memory first; `saveWorkspaceState` returns `false` when storage is missing,
+  blocked or full, and the UI then says the change is in memory only.
+- "Reset seeded cases" restores the six prospects and clears next actions, overrides and history,
+  keeping the simulated role.
+
 ## Open questions (not built yet)
 
-- How a manager override affects slotting (pin into / force out of focus), and
-  whether only the manager may set one. Today only the reason requirement exists.
-- Persisting fact-change history (who changed what, with which reason).
+- Real authentication instead of the simulated role switcher.
+- Server-side persistence and shared history across browsers.
