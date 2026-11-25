@@ -9,7 +9,8 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "eval:notes": "tsx scripts/eval-note-graph.ts"
+    "eval:notes": "tsx scripts/eval-note-graph.ts",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@langchain/anthropic": "^1.6.6",
