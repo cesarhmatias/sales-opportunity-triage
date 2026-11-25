@@ -1,36 +1,12 @@
 import { z } from "zod";
-import { isIsoDate } from "../domain/dates";
+import { managerOverrideSchema, nextActionSchema, prospectRecordSchema } from "../domain/schemas";
 import { createSeedWorkspace, type WorkspaceState } from "../domain/workspace";
 
 export const STORAGE_KEY = "sales_triage_v1";
 
 /* ---------- Schema (validated on every load; anything else falls back to seeds) ---------- */
 
-const isoDate = z.string().refine(isIsoDate, "Expected a YYYY-MM-DD date");
 const stance = z.enum(["work_today", "queue_next", "excluded"]);
-
-const prospectFactsSchema = z.object({
-  id: z.string().min(1),
-  company: z.string().min(1),
-  potentialAcvUsd: z.number().finite().nonnegative(),
-  workflowFit: z.enum(["strong", "apparent", "mixed", "poor"]),
-  economicBuyer: z.object({
-    status: z.enum(["confirmed", "unknown", "no_access"]),
-    name: z.string().nullable(),
-    title: z.string().nullable(),
-  }),
-  budget: z.enum(["confirmed", "not_confirmed", "unknown"]),
-  targetDecisionDate: isoDate.nullable(),
-  requirements: z.array(
-    z.object({ description: z.string(), support: z.enum(["supported", "custom_work", "unsupported"]) }),
-  ),
-});
-
-const nextActionSchema = z.object({
-  summary: z.string(),
-  ownerId: z.string(),
-  followUpDate: isoDate,
-});
 
 const rankSnapshotSchema = z.object({
   rank: z.number().int().positive(),
@@ -56,17 +32,9 @@ export const workspaceStateSchema = z
   .object({
     version: z.literal(1),
     actorId: z.string().min(1),
-    prospects: z.array(prospectFactsSchema),
+    prospects: z.array(prospectRecordSchema),
     nextActions: z.record(z.string(), nextActionSchema),
-    overrides: z.array(
-      z.object({
-        prospectId: z.string().min(1),
-        decision: z.enum(["pin_focus", "hold_out"]),
-        reason: z.string(),
-        setBy: z.string(),
-        setAt: z.string(),
-      }),
-    ),
+    overrides: z.array(managerOverrideSchema),
     revisions: z.array(revisionSchema),
   })
   .refine((s) => new Set(s.prospects.map((p) => p.id)).size === s.prospects.length, "Duplicate prospect ids");
