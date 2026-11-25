@@ -1,54 +1,33 @@
 "use client";
 
-import { useState } from "react";
 import { explainFactors, explainStance, STANCE_LABEL } from "../../domain/explain";
 import type { OverrideDecision, TriageEntry } from "../../domain/types";
 import type { FieldError } from "../../domain/validation";
-import {
-  STANCE_BADGE,
-  cardClass,
-  cardTitleClass,
-  errorTextClass,
-  formatTimestamp,
-  hintClass,
-  inputClass,
-  labelClass,
-  primaryButtonClass,
-  teamMemberName,
-} from "../ui";
+import { STANCE_BADGE, cardClass, cardTitleClass } from "../ui";
+import { ManagerOverridePanel } from "./ManagerOverridePanel";
 
 interface PrioritizationRuleCardProps {
   entry: TriageEntry;
   focusSlots: number;
+  actorId: string;
   canOverride: boolean;
   onApplyOverride: (decision: OverrideDecision | null, reason: string) => FieldError[];
+  onSwitchToManager: (managerId: string) => void;
 }
 
-const OVERRIDE_CHOICES: { value: OverrideDecision | "none"; label: string; hint: string }[] = [
-  { value: "none", label: "No override", hint: "Follow the prioritization rule." },
-  { value: "pin_focus", label: "Pin to today's focus", hint: "Takes a focus slot even if the rule ranks it lower." },
-  { value: "hold_out", label: "Hold out of today's focus", hint: "Frees its slot for the next eligible prospect." },
-];
-
-export function PrioritizationRuleCard({ entry, focusSlots, canOverride, onApplyOverride }: PrioritizationRuleCardProps) {
+export function PrioritizationRuleCard({
+  entry,
+  focusSlots,
+  actorId,
+  canOverride,
+  onApplyOverride,
+  onSwitchToManager,
+}: PrioritizationRuleCardProps) {
   const { facts, evaluation } = entry;
   const score = evaluation.priorityScore;
   const factors = explainFactors(facts, evaluation);
   const current = evaluation.override;
 
-  const [choice, setChoice] = useState<OverrideDecision | "none">(current?.decision ?? "none");
-  const [reason, setReason] = useState("");
-  const [errors, setErrors] = useState<FieldError[]>([]);
-
-  // Gated prospects can only have a stale override cleared, never a new one set.
-  const overrideLocked = !canOverride || (!evaluation.eligible && !current);
-  const reasonError = errors.find((e) => e.field === "reason");
-  const otherErrors = errors.filter((e) => e.field !== "reason");
-
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setErrors(onApplyOverride(choice === "none" ? null : choice, reason));
-  }
 
   return (
     <section aria-labelledby="rule-heading" className={cardClass}>
@@ -124,84 +103,15 @@ export function PrioritizationRuleCard({ entry, focusSlots, canOverride, onApply
         </>
       )}
 
-      <form onSubmit={handleSubmit} noValidate className="mt-5 border-t border-slate-200 pt-4">
-        <fieldset disabled={overrideLocked} className="space-y-3">
-          <legend className="text-sm font-semibold text-slate-800">Manager override</legend>
-          <p className="text-sm text-slate-600">
-            {current
-              ? `Current: ${current.decision === "pin_focus" ? "pinned to today's focus" : "held out of today's focus"} by ${teamMemberName(current.setBy)} on ${formatTimestamp(current.setAt)}. Reason: “${current.reason}”`
-              : "No override. Overrides change slot allocation only; the score above never changes."}
-          </p>
-          {!canOverride && (
-            <p className="text-sm text-slate-600">
-              Only Jordan Lee (Sales Manager) can set overrides. Switch the simulated role to try it.
-            </p>
-          )}
-          {canOverride && !evaluation.eligible && (
-            <p className="text-sm text-slate-600">
-              Gated prospects can&rsquo;t be overridden into or out of focus
-              {current ? "; you can only clear the existing override." : "."}
-            </p>
-          )}
-
-          <div className="space-y-2">
-            {OVERRIDE_CHOICES.map((option) => {
-              const id = `override-${facts.id}-${option.value}`;
-              return (
-                <div key={option.value} className="flex items-start gap-2">
-                  <input
-                    id={id}
-                    type="radio"
-                    name={`override-${facts.id}`}
-                    value={option.value}
-                    checked={choice === option.value}
-                    onChange={() => setChoice(option.value)}
-                    disabled={!evaluation.eligible && option.value !== "none"}
-                    className="mt-0.5 size-4"
-                  />
-                  <label htmlFor={id} className="text-sm">
-                    <span className="font-medium text-slate-800">{option.label}</span>
-                    <span className="block text-xs text-slate-500">{option.hint}</span>
-                  </label>
-                </div>
-              );
-            })}
-          </div>
-
-          <div>
-            <label htmlFor={`override-reason-${facts.id}`} className={labelClass}>
-              Override reason
-            </label>
-            <textarea
-              id={`override-reason-${facts.id}`}
-              rows={2}
-              className={inputClass}
-              value={reason}
-              onChange={(event) => setReason(event.target.value)}
-              aria-invalid={reasonError ? true : undefined}
-              aria-describedby={`override-reason-hint-${facts.id}${reasonError ? ` override-reason-error-${facts.id}` : ""}`}
-            />
-            <p id={`override-reason-hint-${facts.id}`} className={hintClass}>
-              Required when setting an override (at least 10 characters and 2 words). Optional when clearing.
-            </p>
-            {reasonError && (
-              <p id={`override-reason-error-${facts.id}`} className={errorTextClass}>
-                {reasonError.message}
-              </p>
-            )}
-          </div>
-          {otherErrors.length > 0 && (
-            <ul role="alert" className="text-sm font-medium text-red-700">
-              {otherErrors.map((e) => (
-                <li key={e.field + e.message}>{e.message}</li>
-              ))}
-            </ul>
-          )}
-          <button type="submit" className={primaryButtonClass}>
-            Apply override
-          </button>
-        </fieldset>
-      </form>
+      <ManagerOverridePanel
+        prospectId={facts.id}
+        eligible={evaluation.eligible}
+        current={current}
+        actorId={actorId}
+        canOverride={canOverride}
+        onApply={onApplyOverride}
+        onSwitchToManager={onSwitchToManager}
+      />
     </section>
   );
 }

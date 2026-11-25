@@ -1,7 +1,7 @@
 "use client";
 
 import { CircleCheck, Columns2, RotateCcw, TriangleAlert } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { STANCE_LABEL } from "../domain/explain";
 import type { NextAction, OverrideDecision } from "../domain/types";
 import { TEAM, type FieldError } from "../domain/validation";
@@ -9,12 +9,14 @@ import {
   REFERENCE_DATE,
   applyManagerOverride,
   applyQualificationUpdate,
+  displacedFromFocus,
   isManager,
   triageWorkspace,
   type QualificationDraft,
   type WorkspaceState,
 } from "../domain/workspace";
 import { EMPTY_FILTERS, filterEntries, type QueueFilters as Filters } from "../lib/queueFilters";
+import type { WorkspaceStore } from "../storage/triageStorage";
 import { useWorkspaceSnapshot, workspaceStore } from "../storage/useWorkspaceStore";
 import { CompareModal } from "./CompareModal";
 import { ProspectInspector } from "./ProspectInspector";
@@ -25,7 +27,15 @@ import { ROLE_LABEL, formatAcvShort, formatDate, inputClass, labelClass, seconda
 const MAX_COMPARE = 3;
 const QUICK_COMPARE = ["birch", "alder"] as const;
 
-type Notice = { tone: "success" | "warning"; text: string };
+/** `focus` moves keyboard focus to the banner (used after a save so the outcome is announced). */
+type Notice = { tone: "success" | "warning"; text: string; focus: boolean };
+
+/** Matches Tailwind's `lg` breakpoint, where the queue and inspector stack vertically below it. */
+const STACKED_LAYOUT_QUERY = "(max-width: 1023.98px)";
+
+function joinNames(names: string[]): string {
+  return names.length <= 1 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+}
 
 const MEMORY_ONLY =
   "Browser storage is unavailable, so this change is kept in memory only and will be lost when you reload.";
@@ -36,8 +46,8 @@ function newRevisionId(): string {
     : `rev-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-export function TriageWorkspace() {
-  const snapshot = useWorkspaceSnapshot();
+export function TriageWorkspace({ store = workspaceStore }: { store?: WorkspaceStore }) {
+  const snapshot = useWorkspaceSnapshot(store);
   const { state } = snapshot;
   const result = useMemo(() => triageWorkspace(state), [state]);
 
@@ -48,6 +58,13 @@ export function TriageWorkspace() {
   const [notice, setNotice] = useState<Notice | null>(null);
   const [resetCount, setResetCount] = useState(0);
   const compareTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const noticeRef = useRef<HTMLDivElement>(null);
+  const inspectorRef = useRef<HTMLDivElement>(null);
+
+  // Each new notice object that asks for focus gets it, so repeated saves are announced too.
+  useEffect(() => {
+    if (notice?.focus) noticeRef.current?.focus();
+  }, [notice]);
 
   const visible = filterEntries(result.entries, filters);
   const focus = visible.filter((e) => e.evaluation.inFocusSlot);
@@ -60,25 +77,51 @@ export function TriageWorkspace() {
     (e) => e !== undefined,
   );
 
-  /** Commits a new state and reports honestly whether it reached browser storage. */
-  function commit(next: WorkspaceState, successText: string) {
-    const persisted = workspaceStore.update(() => next);
-    setNotice(persisted ? { tone: "success", text: successText } : { tone: "warning", text: `${successText} ${MEMORY_ONLY}` });
+  /**
+   * Commits a new state, names anyone displaced from today's slots, and reports honestly
+   * whether the change reached browser storage.
+   */
+  function commit(previous: WorkspaceState, next: WorkspaceState, prospectId: string, successText: string) {
+    const displaced = displacedFromFocus(triageWorkspace(previous), triageWorkspace(next), prospectId);
+    const displacedText =
+      displaced.length > 0
+        ? ` ${joinNames(displaced)} ${displaced.length === 1 ? "was" : "were"} displaced from today's ${result.focusSlots} focus slots.`
+        : "";
+    const text = `${successText}${displacedText}`;
+    const persisted = store.update(() => next);
+    setNotice(
+      persisted ? { tone: "success", text, focus: true } : { tone: "warning", text: `${text} ${MEMORY_ONLY}`, focus: true },
+    );
   }
 
   function handleRoleChange(actorId: string) {
-    const persisted = workspaceStore.update((s) => ({ ...s, actorId }));
-    if (!persisted) setNotice({ tone: "warning", text: `Role switched. ${MEMORY_ONLY}` });
+    const persisted = store.update((s) => ({ ...s, actorId }));
+    if (!persisted) setNotice({ tone: "warning", text: `Role switched. ${MEMORY_ONLY}`, focus: false });
+  }
+
+  function handleSelect(prospectId: string) {
+    // A confirmation about one prospect shouldn't linger while inspecting another.
+    if (prospectId !== selectedId) setNotice(null);
+    setSelectedId(prospectId);
+    // Below the lg breakpoint the inspector sits under the queue, so bring it into view.
+    if (typeof window !== "undefined" && window.matchMedia?.(STACKED_LAYOUT_QUERY).matches) {
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)")?.matches ?? false;
+      inspectorRef.current?.scrollIntoView?.({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+    }
   }
 
   function handleReset() {
-    const persisted = workspaceStore.reset();
+    const persisted = store.reset();
     setCompareIds([]);
     setResetCount((n) => n + 1);
     setNotice(
       persisted
-        ? { tone: "success", text: "Seeded cases restored. Saved changes, next actions and overrides were cleared." }
-        : { tone: "warning", text: `Seeded cases restored. ${MEMORY_ONLY}` },
+        ? {
+            tone: "success",
+            text: "Seeded cases restored. Saved changes, next actions and overrides were cleared.",
+            focus: false,
+          }
+        : { tone: "warning", text: `Seeded cases restored. ${MEMORY_ONLY}`, focus: false },
     );
   }
 
@@ -88,7 +131,7 @@ export function TriageWorkspace() {
     reason: string,
     nextAction: NextAction,
   ): FieldError[] {
-    const current = workspaceStore.getSnapshot().state;
+    const current = store.getSnapshot().state;
     const outcome = applyQualificationUpdate(current, {
       prospectId,
       draft,
@@ -98,18 +141,23 @@ export function TriageWorkspace() {
       at: new Date().toISOString(),
       revisionId: newRevisionId(),
     });
-    if (!outcome.ok) return outcome.errors;
+    if (!outcome.ok) {
+      setNotice(null); // never leave an earlier "Saved" banner above a "Not saved" error
+      return outcome.errors;
+    }
     const { after } = outcome.revision;
     const company = current.prospects.find((p) => p.id === prospectId)?.company ?? prospectId;
     commit(
+      current,
       outcome.state,
+      prospectId,
       `Saved ${company}: now #${after.rank}, ${after.score === null ? "gated" : `${after.score} pts`}, ${STANCE_LABEL[after.stance]}.`,
     );
     return [];
   }
 
   function handleApplyOverride(prospectId: string, decision: OverrideDecision | null, reason: string): FieldError[] {
-    const current = workspaceStore.getSnapshot().state;
+    const current = store.getSnapshot().state;
     const outcome = applyManagerOverride(current, {
       prospectId,
       decision,
@@ -118,9 +166,18 @@ export function TriageWorkspace() {
       at: new Date().toISOString(),
       revisionId: newRevisionId(),
     });
-    if (!outcome.ok) return outcome.errors;
+    if (!outcome.ok) {
+      setNotice(null);
+      return outcome.errors;
+    }
     const { after } = outcome.revision;
-    commit(outcome.state, `Override ${decision === null ? "cleared" : "applied"}: now #${after.rank}, ${STANCE_LABEL[after.stance]}.`);
+    const company = current.prospects.find((p) => p.id === prospectId)?.company ?? prospectId;
+    commit(
+      current,
+      outcome.state,
+      prospectId,
+      `Override ${decision === null ? "cleared" : "applied"} for ${company}: now #${after.rank}, ${STANCE_LABEL[after.stance]}.`,
+    );
     return [];
   }
 
@@ -166,7 +223,7 @@ export function TriageWorkspace() {
               key={entry.facts.id}
               entry={entry}
               selected={entry.facts.id === selected.facts.id}
-              onSelect={setSelectedId}
+              onSelect={handleSelect}
               compareChecked={compareIds.includes(entry.facts.id)}
               compareDisabled={compareIds.length >= MAX_COMPARE}
               onToggleCompare={handleToggleCompare}
@@ -239,7 +296,12 @@ export function TriageWorkspace() {
           </p>
         )}
         {notice && (
-          <p
+          <div
+            ref={noticeRef}
+            tabIndex={-1}
+            role="status"
+            data-testid="save-banner"
+            data-tone={notice.tone}
             className={`flex items-start gap-2 rounded-md border p-3 text-sm ${
               notice.tone === "success"
                 ? "border-emerald-300 bg-emerald-50 text-emerald-900"
@@ -247,12 +309,16 @@ export function TriageWorkspace() {
             }`}
           >
             {notice.tone === "success" ? (
-              <CircleCheck aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+              <CircleCheck aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-emerald-600" />
             ) : (
-              <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+              <TriangleAlert
+                aria-hidden="true"
+                data-testid="warning-icon"
+                className="mt-0.5 size-4 shrink-0 text-amber-600"
+              />
             )}
-            {notice.text}
-          </p>
+            <p>{notice.text}</p>
+          </div>
         )}
       </div>
 
@@ -309,21 +375,24 @@ export function TriageWorkspace() {
           )}
         </section>
 
-        {selected && (
-          <ProspectInspector
-            key={`${selected.facts.id}:${resetCount}`}
-            entry={selected}
-            state={state}
-            focusSlots={result.focusSlots}
-            canOverride={isManager(state.actorId)}
-            onSaveQualification={handleSaveQualification}
-            onApplyOverride={handleApplyOverride}
-          />
-        )}
+        <div ref={inspectorRef} className="scroll-mt-4">
+          {selected && (
+            <ProspectInspector
+              key={`${selected.facts.id}:${resetCount}`}
+              entry={selected}
+              state={state}
+              focusSlots={result.focusSlots}
+              actorId={state.actorId}
+              canOverride={isManager(state.actorId)}
+              onSaveQualification={handleSaveQualification}
+              onApplyOverride={handleApplyOverride}
+              onSwitchRole={handleRoleChange}
+            />
+          )}
+        </div>
       </main>
 
       <CompareModal entries={comparingEntries} onClose={handleCompareClosed} />
-
     </div>
   );
 }

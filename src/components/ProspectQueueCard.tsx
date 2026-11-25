@@ -66,7 +66,7 @@ export function ProspectQueueCard({
           {evaluation.override && (
             <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 font-medium text-violet-800 ring-1 ring-inset ring-violet-600/30">
               <Pin aria-hidden="true" className="size-3" />
-              {evaluation.override.decision === "pin_focus" ? "Manager pinned" : "Manager held out"}
+              {evaluation.override.decision === "pin_focus" ? "Manager pinned" : "Manager deferred"}
             </span>
           )}
           <span className="text-slate-600">

@@ -14,24 +14,30 @@ interface ProspectInspectorProps {
   entry: TriageEntry;
   state: WorkspaceState;
   focusSlots: number;
+  actorId: string;
   canOverride: boolean;
   onSaveQualification: (prospectId: string, draft: QualificationDraft, reason: string, action: NextAction) => FieldError[];
   onApplyOverride: (prospectId: string, decision: OverrideDecision | null, reason: string) => FieldError[];
+  onSwitchRole: (actorId: string) => void;
 }
 
 export function ProspectInspector({
   entry,
   state,
   focusSlots,
+  actorId,
   canOverride,
   onSaveQualification,
   onApplyOverride,
+  onSwitchRole,
 }: ProspectInspectorProps) {
   const { facts, evaluation } = entry;
   const revisions = revisionsFor(state, facts.id);
   const nextAction = state.nextActions[facts.id] ?? null;
-  // Remount the forms when the prospect or its saved history changes so they reset to saved values.
-  const formKey = `${facts.id}:${revisions.length}`;
+  // Each form remounts (resetting to saved values) only after its own kind of save, so an
+  // override or a role switch never wipes an unsaved qualification/next-action draft.
+  const qualificationSaves = revisions.filter((r) => r.kind === "qualification_update").length;
+  const overrideSaves = revisions.length - qualificationSaves;
 
   return (
     <section aria-labelledby="inspector-heading" className="space-y-4">
@@ -47,14 +53,16 @@ export function ProspectInspector({
 
       <ObservedFactsCard entry={entry} />
       <PrioritizationRuleCard
-        key={`rule-${formKey}`}
+        key={`rule-${facts.id}:${overrideSaves}`}
         entry={entry}
         focusSlots={focusSlots}
+        actorId={actorId}
         canOverride={canOverride}
         onApplyOverride={(decision, reason) => onApplyOverride(facts.id, decision, reason)}
+        onSwitchToManager={onSwitchRole}
       />
       <QualificationForm
-        key={`form-${formKey}`}
+        key={`form-${facts.id}:${qualificationSaves}`}
         entry={entry}
         state={state}
         savedNextAction={nextAction}

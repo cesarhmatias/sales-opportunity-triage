@@ -9,7 +9,8 @@ export const workspaceStore: WorkspaceStore = createWorkspaceStore();
 /**
  * Reads the persisted workspace without set-state-in-effect: the server and the
  * hydration pass render the seeded snapshot, then React switches to the stored one.
+ * Tests pass their own store so state never leaks between them.
  */
-export function useWorkspaceSnapshot(): WorkspaceSnapshot {
-  return useSyncExternalStore(workspaceStore.subscribe, workspaceStore.getSnapshot, workspaceStore.getServerSnapshot);
+export function useWorkspaceSnapshot(store: WorkspaceStore = workspaceStore): WorkspaceSnapshot {
+  return useSyncExternalStore(store.subscribe, store.getSnapshot, store.getServerSnapshot);
 }
