@@ -297,8 +297,9 @@ describe("deterministic tie-break", () => {
   });
 
   it("finally orders by company name", () => {
-    const zeta = prospect({ id: "z", company: "Zeta" });
-    const acme = prospect({ id: "a", company: "Acme" });
-    expect(orderOf([zeta, acme])).toEqual(["a", "z"]);
+    // Ids sort opposite to company names, so only the company rule can decide.
+    const zeta = prospect({ id: "a", company: "Zeta" });
+    const acme = prospect({ id: "z", company: "Acme" });
+    expect(orderOf([zeta, acme])).toEqual(["z", "a"]);
   });
 });
