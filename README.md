@@ -116,7 +116,7 @@ The copilot turns a messy call note into a draft for the manual form. It is a La
 1. extract_facts proposes only facts the note states as current, each with an exact quote from the note. Negated, hypothetical, hoped-for, questioned or third-party statements, and the rep's own task timings, are left out.
 2. verify_entailment first removes any proposal whose quote is not literally in the note. It then asks the model whether each remaining quote really supports its value in context. If anything is rejected on the first pass, extraction runs once more with the rejection reasons.
 3. simulate_impact applies the verified facts and reruns the same ranking engine to show how rank and score would move and who would lose a slot.
-4. draft_action proposes a specific next action for the remaining gaps and checks it with the same validation the form uses. If the model's draft fails, a plain template for the most important gap replaces it.
+4. draft_action proposes a specific next action. The gap it should close is chosen in code, in a fixed order (eligibility, then buyer, then budget, then timeline), so the same facts always aim at the same gap; record-keeping gaps such as a missing job title are not sent to the model. The draft must be a step with the prospect, not an internal chore, and it must pass the same validation the form uses. If it fails either check, a plain template for that gap replaces it.
 
 Each step is recorded with its status, a short summary and how long it took, and the panel shows that trace.
 
@@ -128,7 +128,9 @@ The copilot never saves anything. Applying a draft only fills the form, and the 
 
 npm run eval:notes runs 12 deliberately hard call notes through the live graph and prints a pass/fail table. The cases cover a positive Cedar discovery call, explicit negation, negation written with a curly apostrophe, open questions, future and conditional statements, doubt about budget, a conditional timeline, a negated blocker, a rep's task duration mistaken for a buying window, a competitor's opinion, two people where only one is the decision maker, and an explicit "budget not confirmed" with a 14-day window.
 
-Current result: not scored yet. The API key available in my environment was rejected by Anthropic with an authentication error, so every live run has stopped at the first call. The graph's control flow (quote check, retry loop, impact simulation, action fallback) is covered by unit tests with scripted model responses, but the quality of the live prompts on these 12 cases is unmeasured.
+Current result: 12 of 12 cases passed in each of two full runs against claude-sonnet-5-5, the model set in my .env.local. Two runs of a model that cannot be pinned to deterministic sampling are a small sample, so I treat this as "no failures seen yet", not as a guarantee.
+
+In all 24 executions the extractor avoided the traps on its own and the verifier accepted every proposal on the first pass, so the retry loop never ran live. That loop, like the literal quote check and the action fallback, is covered by unit tests with scripted model responses. The default model, claude-haiku-4-5, has not been evaluated.
 
 ### How this was built: AI coding agent disclosure
 
@@ -196,18 +198,20 @@ The end-to-end tests start their own production server on port 3100 with the API
 - The rate limit is kept in server memory, so on a serverless host it applies per instance and resets on cold starts.
 - The check for vague next actions uses a list of generic words. A summary with one specific-looking word, such as "follow up with them pls", can still pass.
 - The copilot does not extract job titles, so a confirmed buyer from a note still shows "title not recorded" until the rep adds it.
+- The wording of the drafted next action varies between runs of the same note. The target gap is fixed in code, but the sentence is the model's, so reps should read it before saving.
 - The role switcher is a simulation, not authentication.
 
 ## What remains untested
 
-- The live copilot path and the 12-case eval, because the available API key was rejected.
+- The retry loop in a live run. It never triggered across 24 live executions, so its behavior with a real model is untested.
+- The default model, claude-haiku-4-5. The eval and live checks ran on claude-sonnet-5-5.
 - Browsers other than Chromium; the end-to-end suite runs in Chromium only.
 - Real screen reader use. Labels, focus order and ARIA attributes are tested in code, not with assistive technology.
-- Behavior on the actual deployment, including rate limiting across instances.
+- A published deployment. I ran the full copilot flow through the interface against a local production build (next build and next start) with a real key, but not on the hosted site, so rate limiting across serverless instances is also untested.
 
 ## Next steps
 
-1. Run npm run eval:notes with a valid key, fix any failing cases in the prompts, and record the score here.
+1. Grow the eval with notes designed to slip past the extractor, so the verifier and retry loop are exercised live, and run it against claude-haiku-4-5 as well.
 2. Add a shared backend with real sign-in so the team works from one queue and one change history.
 3. Log the events the success metric needs and capture the three-week baseline before rollout.
 4. Let the copilot extract buyer titles with the same quote and verification rules.
