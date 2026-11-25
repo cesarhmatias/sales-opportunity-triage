@@ -13,6 +13,7 @@ import {
   isManager,
   triageWorkspace,
   type QualificationDraft,
+  type RankSnapshot,
   type WorkspaceState,
 } from "../domain/workspace";
 import { EMPTY_FILTERS, filterEntries, type QueueFilters as Filters } from "../lib/queueFilters";
@@ -32,6 +33,8 @@ type Notice = { tone: "success" | "warning"; text: string; focus: boolean };
 
 /** Matches Tailwind's `lg` breakpoint, where the queue and inspector stack vertically below it. */
 const STACKED_LAYOUT_QUERY = "(max-width: 1023.98px)";
+
+const scoreText = (score: number | null) => (score === null ? "gated" : `${score} pts`);
 
 function joinNames(names: string[]): string {
   return names.length <= 1 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
@@ -81,13 +84,22 @@ export function TriageWorkspace({ store = workspaceStore }: { store?: WorkspaceS
    * Commits a new state, names anyone displaced from today's slots, and reports honestly
    * whether the change reached browser storage.
    */
-  function commit(previous: WorkspaceState, next: WorkspaceState, prospectId: string, successText: string) {
+  function commit(
+    previous: WorkspaceState,
+    next: WorkspaceState,
+    prospectId: string,
+    headline: string,
+    revision: { before: RankSnapshot; after: RankSnapshot },
+  ) {
+    const company = previous.prospects.find((p) => p.id === prospectId)?.company ?? prospectId;
+    const { before, after } = revision;
+    const movement = `#${before.rank} (${scoreText(before.score)}) → #${after.rank} (${scoreText(after.score)}), ${STANCE_LABEL[after.stance]}.`;
     const displaced = displacedFromFocus(triageWorkspace(previous), triageWorkspace(next), prospectId);
     const displacedText =
       displaced.length > 0
-        ? ` ${joinNames(displaced)} ${displaced.length === 1 ? "was" : "were"} displaced from today's ${result.focusSlots} focus slots.`
+        ? ` ${company} now ranks ahead of ${joinNames(displaced)}, which ${displaced.length === 1 ? "was" : "were"} displaced from today's ${result.focusSlots} focus slots.`
         : "";
-    const text = `${successText}${displacedText}`;
+    const text = `${headline} ${company}: ${movement}${displacedText}`;
     const persisted = store.update(() => next);
     setNotice(
       persisted ? { tone: "success", text, focus: true } : { tone: "warning", text: `${text} ${MEMORY_ONLY}`, focus: true },
@@ -145,14 +157,7 @@ export function TriageWorkspace({ store = workspaceStore }: { store?: WorkspaceS
       setNotice(null); // never leave an earlier "Saved" banner above a "Not saved" error
       return outcome.errors;
     }
-    const { after } = outcome.revision;
-    const company = current.prospects.find((p) => p.id === prospectId)?.company ?? prospectId;
-    commit(
-      current,
-      outcome.state,
-      prospectId,
-      `Saved ${company}: now #${after.rank}, ${after.score === null ? "gated" : `${after.score} pts`}, ${STANCE_LABEL[after.stance]}.`,
-    );
+    commit(current, outcome.state, prospectId, "Saved", outcome.revision);
     return [];
   }
 
@@ -170,14 +175,7 @@ export function TriageWorkspace({ store = workspaceStore }: { store?: WorkspaceS
       setNotice(null);
       return outcome.errors;
     }
-    const { after } = outcome.revision;
-    const company = current.prospects.find((p) => p.id === prospectId)?.company ?? prospectId;
-    commit(
-      current,
-      outcome.state,
-      prospectId,
-      `Override ${decision === null ? "cleared" : "applied"} for ${company}: now #${after.rank}, ${STANCE_LABEL[after.stance]}.`,
-    );
+    commit(current, outcome.state, prospectId, `Override ${decision === null ? "cleared" : "applied"} for`, outcome.revision);
     return [];
   }
 

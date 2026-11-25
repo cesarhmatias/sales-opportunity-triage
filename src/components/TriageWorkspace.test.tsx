@@ -107,8 +107,8 @@ describe("save confirmation banner", () => {
 
     const banner = screen.getByTestId("save-banner");
     expect(banner).toHaveAttribute("data-tone", "success");
-    expect(banner).toHaveTextContent("Saved Cedar: now #3, 62 pts, Work today.");
-    expect(banner).toHaveTextContent("Fern was displaced from today's 3 focus slots.");
+    expect(banner).toHaveTextContent("Saved Cedar: #4 (37 pts) → #3 (62 pts), Work today.");
+    expect(banner).toHaveTextContent("Cedar now ranks ahead of Fern, which was displaced from today's 3 focus slots.");
     expect(banner).toHaveFocus();
   });
 
