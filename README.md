@@ -111,7 +111,7 @@ I have not run this measurement, so I am not claiming any improvement.
 
 ### The call-note copilot
 
-The copilot turns a messy call note into a draft for the manual form. It is a LangGraph graph with four steps and one loop, calling Claude through LangChain's Anthropic integration (the model comes from ANTHROPIC_MODEL, defaulting to claude-haiku-4-5):
+The copilot turns a messy call note into a draft for the manual form. It is a LangGraph graph with four steps and one loop, calling Claude through LangChain's Anthropic integration (the model comes from ANTHROPIC_MODEL and defaults to claude-sonnet-5-5, the model the eval below was run on, so a deployment that sets nothing still runs an evaluated model):
 
 1. extract_facts proposes only facts the note states as current, each with an exact quote from the note. Negated, hypothetical, hoped-for, questioned or third-party statements, and the rep's own task timings, are left out.
 2. verify_entailment first removes any proposal whose quote is not literally in the note. It then asks the model whether each remaining quote really supports its value in context. If anything is rejected on the first pass, extraction runs once more with the rejection reasons.
@@ -130,20 +130,29 @@ npm run eval:notes runs 12 deliberately hard call notes through the live graph a
 
 Current result: 12 of 12 cases passed in each of two full runs against claude-sonnet-5-5, the model set in my .env.local. Two runs of a model that cannot be pinned to deterministic sampling are a small sample, so I treat this as "no failures seen yet", not as a guarantee.
 
-In all 24 executions the extractor avoided the traps on its own and the verifier accepted every proposal on the first pass, so the retry loop never ran live. That loop, like the literal quote check and the action fallback, is covered by unit tests with scripted model responses. The default model, claude-haiku-4-5, has not been evaluated.
+In all 24 executions the extractor avoided the traps on its own and the verifier accepted every proposal on the first pass, so the retry loop never ran live. That loop, like the literal quote check and the action fallback, is covered by unit tests with scripted model responses. Other models, such as the cheaper claude-haiku-4-5 I first planned as the default, have not been evaluated; switching ANTHROPIC_MODEL should come with a new eval run.
 
 ### How this was built: AI coding agent disclosure
 
 I used an AI coding agent (Claude Code) heavily. It wrote most of the code: project scaffolding, the domain and storage modules, the React components and their wiring, the LangGraph graph and its prompts, the API route, the unit, component and end-to-end test suites, and the first draft of this README.
 
-What came from me:
+What came from me, Cesar, as design input:
 
 - The problem framing, the users, and the prioritization rule: the gate, the 40/30/15/15 weights, the cut-offs and the tie-break order.
 - The constraints: keep observed facts separate from the derived evaluation, never invent missing fields, never let the model score or rank, require verbatim quotes, return a 503 instead of falling back to pattern matching, and protect the public endpoint.
 - The validation rules for next actions and the requirement for written reasons.
 - The interface requirements: labels on every control, visible keyboard focus, a native modal dialog, an accessible queue, and the persistence-failure warning.
-- The UX fixes after I tested the app locally in the browser: overrides limited to the manager with a quick role switch, drafts that survive role switches, focus moved to invalid fields and to the save confirmation, the confirmation clearing when another deal is selected, and the inspector scrolling into view on phones.
-- The 12 adversarial eval cases.
+
+Corrections I, Cesar, made after testing and reviewing the agent's work:
+
+- UX fixes from testing the app locally in the browser: overrides limited to the manager with a quick role switch, drafts that survive role switches, focus moved to invalid fields and to the save confirmation, the confirmation clearing when another deal is selected, and the inspector scrolling into view on phones.
+- The 12 adversarial eval cases, written to catch the failure modes I expected from the copilot: negations, curly apostrophes, modal and conditional statements, third-party claims, rep task durations and multi-person notes.
+- The API key diagnosis. The agent reported the key as probably revoked; I found that the stored value had a duplicated "sk-ant-" prefix.
+- The end-to-end fixture showed a rejection and retry that never happened in a live run with the same note. It now replays a real recorded response.
+- A live run drafted a next action to record a title "in the CRM", and this team has no CRM. Drafts are now aimed at one prospect-facing gap chosen in code, and internal chores fall back to a template.
+- A drafted action emailed the CFO the note had ruled out as decision maker. It is now an explicit rule that such a person may be asked for a referral but never treated as the buyer.
+- The default model in the code was not the model the eval ran on, so a deployment without ANTHROPIC_MODEL would have run an untested model. The default is now the evaluated one.
+- A rejected API key fell into the generic "try again" error. It now returns a specific "misconfigured" message, because retrying cannot fix it.
 
 Some decisions were proposed by the agent and accepted by me, and I want them visible: how manager overrides interact with slots, scoring an already-passed decision date as 0, and dropping the temperature setting because the installed Anthropic SDK targets an API version that rejects it.
 
@@ -164,8 +173,8 @@ The copilot is optional. To enable it, create .env.local with:
 
 ```bash
 ANTHROPIC_API_KEY=your-key
-# optional, defaults to claude-haiku-4-5
-ANTHROPIC_MODEL=claude-haiku-4-5
+# optional, defaults to claude-sonnet-5-5 (the evaluated model)
+ANTHROPIC_MODEL=claude-sonnet-5-5
 ```
 
 ### Automated checks
@@ -204,14 +213,14 @@ The end-to-end tests start their own production server on port 3100 with the API
 ## What remains untested
 
 - The retry loop in a live run. It never triggered across 24 live executions, so its behavior with a real model is untested.
-- The default model, claude-haiku-4-5. The eval and live checks ran on claude-sonnet-5-5.
+- Any model other than claude-sonnet-5-5. The eval and live checks ran only on it.
 - Browsers other than Chromium; the end-to-end suite runs in Chromium only.
 - Real screen reader use. Labels, focus order and ARIA attributes are tested in code, not with assistive technology.
 - A published deployment. I ran the full copilot flow through the interface against a local production build (next build and next start) with a real key, but not on the hosted site, so rate limiting across serverless instances is also untested.
 
 ## Next steps
 
-1. Grow the eval with notes designed to slip past the extractor, so the verifier and retry loop are exercised live, and run it against claude-haiku-4-5 as well.
+1. Grow the eval with notes designed to slip past the extractor, so the verifier and retry loop are exercised live, and run it against a cheaper model such as claude-haiku-4-5 before considering a switch.
 2. Add a shared backend with real sign-in so the team works from one queue and one change history.
 3. Log the events the success metric needs and capture the three-week baseline before rollout.
 4. Let the copilot extract buyer titles with the same quote and verification rules.
