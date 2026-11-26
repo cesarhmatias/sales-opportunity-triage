@@ -1,4 +1,4 @@
-Live prototype: (add the deployed URL here)
+Live prototype: https://sales-opportunity-triage.vercel.app/
 Repository: https://github.com/cesarhmatias/sales-opportunity-triage
 
 # Sales Opportunity Triage
@@ -128,7 +128,7 @@ The copilot never saves anything. Applying a draft only fills the form, and the 
 
 npm run eval:notes runs 12 deliberately hard call notes through the live graph and prints a pass/fail table. The cases cover a positive Cedar discovery call, explicit negation, negation written with a curly apostrophe, open questions, future and conditional statements, doubt about budget, a conditional timeline, a negated blocker, a rep's task duration mistaken for a buying window, a competitor's opinion, two people where only one is the decision maker, and an explicit "budget not confirmed" with a 14-day window.
 
-Current result: 12 of 12 cases passed in each of two full runs against claude-sonnet-5-5, the model set in my .env.local. Two runs of a model that cannot be pinned to deterministic sampling are a small sample, so I treat this as "no failures seen yet", not as a guarantee.
+Current result: 12 of 12 cases passed in each of two full runs against claude-sonnet-5-5, executed by the coding agent with the key and model in my .env.local. Two runs of a model that cannot be pinned to deterministic sampling are a small sample, so I treat this as "no failures seen yet", not as a guarantee.
 
 In all 24 executions the extractor avoided the traps on its own and the verifier accepted every proposal on the first pass, so the retry loop never ran live. That loop, like the literal quote check and the action fallback, is covered by unit tests with scripted model responses. Other models, such as the cheaper claude-haiku-4-5 I first planned as the default, have not been evaluated; switching ANTHROPIC_MODEL should come with a new eval run.
 
@@ -219,13 +219,14 @@ The end-to-end tests start their own production server on port 3100 with the API
 - Any model other than claude-sonnet-5-5. The eval and live checks ran only on it.
 - Browsers other than Chromium; the end-to-end suite runs in Chromium only.
 - Real screen reader use. Labels, focus order and ARIA attributes are tested in code, not with assistive technology.
-- A published deployment. I ran the full copilot flow through the interface against a local production build (next build and next start) with a real key, but not on the hosted site, so rate limiting across serverless instances is also untested.
+- Rate limiting on the hosted site. The limit lives in each serverless instance's memory, and nobody has tested how it behaves across instances or cold starts.
+
+What has been checked on the published URL: on 2026-11-25 the coding agent ran the Cedar walkthrough there in a scripted Chromium session. The manual path refused a vague action and an empty date, then saved Cedar at #3 with 62 points with Fern displaced, and the change survived a reload. The copilot path made one live model call (200 in about 6 seconds, verified buyer, name and 21-day window, budget left unknown, no retry) and the applied draft saved with the same result. No console errors, and the phone-width layout scrolled to the inspector.
 
 ## Next steps
 
-1. Deploy to Vercel with ANTHROPIC_API_KEY set to a key that has a spending limit (the endpoint is public), rerun the Cedar walkthrough on the live URL, fill in the Live prototype line above, and update "What remains untested".
-2. Grow the eval with notes designed to slip past the extractor, so the verifier and retry loop are exercised live, and run it against a cheaper model such as claude-haiku-4-5 before considering a switch.
-3. Add a shared backend with real sign-in so the team works from one queue and one change history.
-4. Log the events the success metric needs and capture the three-week baseline before rollout.
-5. Let the copilot extract buyer titles with the same quote and verification rules.
-6. Replace the fixed sample date with the real date in the team's time zone.
+1. Grow the eval with notes designed to slip past the extractor, so the verifier and retry loop are exercised live, and run it against a cheaper model such as claude-haiku-4-5 before considering a switch.
+2. Add a shared backend with real sign-in so the team works from one queue and one change history.
+3. Log the events the success metric needs and capture the three-week baseline before rollout.
+4. Let the copilot extract buyer titles with the same quote and verification rules.
+5. Replace the fixed sample date with the real date in the team's time zone.
