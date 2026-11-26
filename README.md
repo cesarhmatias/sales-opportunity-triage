@@ -1,5 +1,5 @@
 Live prototype: (add the deployed URL here)
-Repository: (add the repository URL here)
+Repository: https://github.com/cesarhmatias/sales-opportunity-triage
 
 # Sales Opportunity Triage
 
@@ -143,11 +143,14 @@ What came from me, Cesar, as design input:
 - The validation rules for next actions and the requirement for written reasons.
 - The interface requirements: labels on every control, visible keyboard focus, a native modal dialog, an accessible queue, and the persistence-failure warning.
 
-Corrections I, Cesar, made after testing and reviewing the agent's work:
+How I reviewed the agent's work: besides testing the app locally in the browser, I ran adversarial review passes with a separate AI session that read the code, the diffs and the live results and reported problems. I decided which findings to act on and directed the fixes. What came out of that process:
 
-- UX fixes from testing the app locally in the browser: overrides limited to the manager with a quick role switch, drafts that survive role switches, focus moved to invalid fields and to the save confirmation, the confirmation clearing when another deal is selected, and the inspector scrolling into view on phones.
-- The 12 adversarial eval cases, written to catch the failure modes I expected from the copilot: negations, curly apostrophes, modal and conditional statements, third-party claims, rep task durations and multi-person notes.
-- The API key diagnosis. The agent reported the key as probably revoked; I found that the stored value had a duplicated "sk-ant-" prefix.
+- UX fixes, from my local testing and the review passes: overrides limited to the manager with a quick role switch, drafts that survive role switches, focus moved to invalid fields and to the save confirmation, the confirmation clearing when another deal is selected, and the inspector scrolling into view on phones.
+- The 12 adversarial eval cases, which combine cases I wanted covered with failure modes the review passes raised: negations, curly apostrophes, modal and conditional statements, third-party claims, rep task durations and multi-person notes.
+
+Found by the review passes, then fixed under my direction:
+
+- The API key failure. The coding agent concluded the key was probably revoked; the review session spotted that the stored value had a duplicated "sk-ant-" prefix.
 - The end-to-end fixture showed a rejection and retry that never happened in a live run with the same note. It now replays a real recorded response.
 - A live run drafted a next action to record a title "in the CRM", and this team has no CRM. Drafts are now aimed at one prospect-facing gap chosen in code, and internal chores fall back to a template.
 - A drafted action emailed the CFO the note had ruled out as decision maker. It is now an explicit rule that such a person may be asked for a referral but never treated as the buyer.
@@ -220,8 +223,9 @@ The end-to-end tests start their own production server on port 3100 with the API
 
 ## Next steps
 
-1. Grow the eval with notes designed to slip past the extractor, so the verifier and retry loop are exercised live, and run it against a cheaper model such as claude-haiku-4-5 before considering a switch.
-2. Add a shared backend with real sign-in so the team works from one queue and one change history.
-3. Log the events the success metric needs and capture the three-week baseline before rollout.
-4. Let the copilot extract buyer titles with the same quote and verification rules.
-5. Replace the fixed sample date with the real date in the team's time zone.
+1. Deploy to Vercel with ANTHROPIC_API_KEY set to a key that has a spending limit (the endpoint is public), rerun the Cedar walkthrough on the live URL, fill in the Live prototype line above, and update "What remains untested".
+2. Grow the eval with notes designed to slip past the extractor, so the verifier and retry loop are exercised live, and run it against a cheaper model such as claude-haiku-4-5 before considering a switch.
+3. Add a shared backend with real sign-in so the team works from one queue and one change history.
+4. Log the events the success metric needs and capture the three-week baseline before rollout.
+5. Let the copilot extract buyer titles with the same quote and verification rules.
+6. Replace the fixed sample date with the real date in the team's time zone.
