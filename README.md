@@ -221,7 +221,7 @@ The end-to-end tests start their own production server on port 3100 with the API
 - Real screen reader use. Labels, focus order and ARIA attributes are tested in code, not with assistive technology.
 - Rate limiting on the hosted site. The limit lives in each serverless instance's memory, and nobody has tested how it behaves across instances or cold starts.
 
-What has been checked on the published URL: on 2026-11-25 the coding agent ran the Cedar walkthrough there in a scripted Chromium session. The manual path refused a vague action and an empty date, then saved Cedar at #3 with 62 points with Fern displaced, and the change survived a reload. The copilot path made one live model call (200 in about 6 seconds, verified buyer, name and 21-day window, budget left unknown, no retry) and the applied draft saved with the same result. No console errors, and the phone-width layout scrolled to the inspector.
+What has been checked on the published URL: on 2026-11-25 the coding agent ran the Cedar walkthrough there in a scripted Chromium session. The manual path refused a vague action and an empty date, then saved Cedar at #3 with 62 points with Fern displaced, and the change survived a reload. The copilot path made one live model call on the default model, claude-sonnet-5-5, since the deployment does not set ANTHROPIC_MODEL (200 in about 6 seconds, verified buyer, name and 21-day window, budget left unknown, no retry) and the applied draft saved with the same result. No console errors, and the phone-width layout scrolled to the inspector.
 
 ## Next steps
 
